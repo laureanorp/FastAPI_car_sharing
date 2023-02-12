@@ -1,10 +1,8 @@
-import json
-
-from pydantic import BaseModel
+from sqlmodel import SQLModel, Field, Relationship
 
 
 # Similar to SQLAlchemy models (I think) with types and defaults
-class CarInput(BaseModel):
+class CarInput(SQLModel):
     size: str | None = 'm'
     fuel: str | None = 'electric'
     doors: int | None = 5  # even if you pass a string, pydantic will convert to int
@@ -23,7 +21,7 @@ class CarInput(BaseModel):
         }
 
 
-class TripInput(BaseModel):
+class TripInput(SQLModel):
     start: int
     end: int
     description: str | None = None
@@ -33,20 +31,19 @@ class TripOutput(TripInput):
     id: int
 
 
+class Trip(TripInput, table=True):  # table=True means this class will be used to create a table
+    id: int | None = Field(primary_key=True, default=None)
+    car_id: int = Field(foreign_key="car.id")  # foreign key to the car table
+    car: "Car" = Relationship(back_populates="trips")  # one to many relationship
+
+
 class CarOutput(CarInput):
     id: int
     # A pydantic model can hold a collection of another class
     trips: list[TripOutput] = []
 
 
-def load_db() -> list[CarOutput]:
-    """ Load a list of car objects from a json file. """
-    with open("cars.json", "r") as f:
-        cars = json.load(f)
-    return [CarOutput(**car) for car in cars]
-
-
-def save_db(cars: list[CarInput]):
-    """ Save a list of car objects to a json file. """
-    with open("cars.json", "w") as f:
-        json.dump([car.dict() for car in cars], f, indent=4)
+class Car(CarInput, table=True):  # table=True means this class will be used to create a table
+    # Attributes will be inherited from CarInput
+    id: int | None = Field(primary_key=True, default=None)  # primary_key=True means this is the primary key
+    trips: list[Trip] = Relationship(back_populates="car")
